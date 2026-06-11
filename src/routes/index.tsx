@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Nav } from "@/components/Nav";
 import { Katori } from "@/components/Katori";
-import paneer from "@/assets/katori-paneer.jpg";
-import dal from "@/assets/katori-dal.jpg";
-import rice from "@/assets/katori-rice.jpg";
-import aloo from "@/assets/katori-aloo.jpg";
-import chole from "@/assets/katori-chole.jpg";
+import paneer from "@/assets/katori-paneer.png";
+import dal from "@/assets/katori-dal.png";
+import rice from "@/assets/katori-rice.png";
+import aloo from "@/assets/katori-aloo.png";
+import chole from "@/assets/katori-chole.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({

@@ -3,8 +3,8 @@ import { Nav } from "@/components/Nav";
 import frankie from "@/assets/dish-frankie.jpg";
 import khichdi from "@/assets/dish-khichdi.jpg";
 import tikki from "@/assets/dish-tikki.jpg";
-import paneer from "@/assets/katori-paneer.jpg";
-import rice from "@/assets/katori-rice.jpg";
+import paneer from "@/assets/katori-paneer.png";
+import rice from "@/assets/katori-rice.png";
 
 export const Route = createFileRoute("/ideas")({
   head: () => ({
