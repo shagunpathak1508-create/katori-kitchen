@@ -1,9 +1,9 @@
 type Freshness = "fresh" | "soon" | "tonight";
 
-const ring: Record<Freshness, string> = {
-  fresh: "border-emerald/50 group-hover:border-emerald",
-  soon: "border-amber/50 group-hover:border-amber",
-  tonight: "border-tomato/60 group-hover:border-tomato",
+const dot: Record<Freshness, string> = {
+  fresh: "bg-emerald",
+  soon: "bg-amber",
+  tonight: "bg-tomato",
 };
 
 const tapeRotate = ["-rotate-2", "rotate-1", "-rotate-1", "rotate-2"];
@@ -19,24 +19,37 @@ interface Props {
 export function Katori({ image, name, freshness, size = "md", rotateIndex = 0 }: Props) {
   const dim = size === "lg" ? "size-44" : size === "sm" ? "size-28" : "size-36";
   return (
-    <div className="group cursor-pointer">
-      <div className="relative flex flex-col items-center">
+    <div className="group cursor-pointer relative">
+      {/* Freshness dot — sits above the bowl like the reference */}
+      <span
+        className={`absolute -top-2 left-1/2 -translate-x-1/2 size-2.5 rounded-full ${dot[freshness]} ring-2 ring-white/80 shadow-sm z-10`}
+        aria-label={freshness}
+      />
+
+      <div className="flex flex-col items-center">
+        {/* Bowl — full photographic image, no clipping */}
         <div
-          className={`absolute -inset-3 rounded-full border-2 ${ring[freshness]} blur-[2px] transition-all`}
-        />
-        <div className={`${dim} rounded-full katori-shine p-[3px] overflow-hidden`}>
+          className={`${dim} relative transition-transform duration-300 group-hover:-translate-y-1`}
+          style={{ filter: "drop-shadow(0 18px 12px rgba(40, 70, 110, 0.25))" }}
+        >
           <img
             src={image}
             alt={name}
             loading="lazy"
-            width={400}
-            height={400}
-            className="w-full h-full rounded-full object-cover ring-1 ring-inset ring-black/40"
+            width={640}
+            height={640}
+            className="w-full h-full object-contain"
           />
         </div>
+
+        {/* Handwritten label with masking tape */}
         <div
-          className={`mt-5 bg-tape px-4 py-1 masking-tape ${tapeRotate[rotateIndex % 4]} group-hover:rotate-0 transition-transform`}
+          className={`-mt-2 bg-tape px-4 py-1 masking-tape ${tapeRotate[rotateIndex % 4]} group-hover:rotate-0 transition-transform relative`}
         >
+          <span
+            className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-3 bg-slate-200/70 -rotate-3"
+            style={{ clipPath: "polygon(2% 0%, 98% 1%, 100% 98%, 0% 100%)" }}
+          />
           <span className="font-hand text-slate-800 text-xl font-bold whitespace-nowrap">
             {name}
           </span>

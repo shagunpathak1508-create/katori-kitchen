@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Nav } from "@/components/Nav";
-import dal from "@/assets/katori-dal.jpg";
+import dal from "@/assets/katori-dal.png";
 
 export const Route = createFileRoute("/magnets")({
   head: () => ({
