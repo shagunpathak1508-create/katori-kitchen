@@ -32,7 +32,7 @@ function IdeasPage() {
 
         {/* Priority pills */}
         <section className="px-8 pt-8 pb-10">
-          <h2 className="font-serif italic text-4xl text-white mb-2">Tonight's Ideas</h2>
+          <h2 className="font-serif italic text-4xl text-slate-900 mb-2">Tonight's Ideas</h2>
           <p className="text-sm text-slate-500 mb-8">Three pulls from the fridge. One hero. Two alternates.</p>
           <div className="space-y-3">
             {timing.map((t, i) => (
@@ -96,20 +96,20 @@ function IdeasPage() {
 
         {/* Alternatives */}
         <section className="px-8 py-12">
-          <h3 className="font-serif italic text-2xl text-white mb-6">Or try...</h3>
+          <h3 className="font-serif italic text-2xl text-slate-900 mb-6">Or try...</h3>
           <div className="grid grid-cols-2 gap-5">
             <button className="text-left group">
               <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 mb-3">
                 <img src={khichdi} alt="" width={400} height={400} className="aspect-square object-cover group-hover:scale-105 transition-transform" />
               </div>
-              <p className="font-serif text-lg text-white leading-tight">Dal Khichdi</p>
+              <p className="font-serif text-lg text-slate-900 leading-tight">Dal Khichdi</p>
               <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-1">2 katoris</p>
             </button>
             <button className="text-left group">
               <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 mb-3">
                 <img src={tikki} alt="" width={400} height={400} className="aspect-square object-cover group-hover:scale-105 transition-transform" />
               </div>
-              <p className="font-serif text-lg text-white leading-tight">Aloo Tikki Stack</p>
+              <p className="font-serif text-lg text-slate-900 leading-tight">Aloo Tikki Stack</p>
               <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-1">1 katori</p>
             </button>
           </div>

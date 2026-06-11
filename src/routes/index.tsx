@@ -29,7 +29,7 @@ function FridgePage() {
         <Nav />
 
         <header className="relative z-10 px-8 pb-2">
-          <p className="font-serif italic text-fridge-glow text-lg">
+          <p className="font-serif italic text-slate-900 text-lg">
             Good evening, Sharma family.
           </p>
           <p className="text-xs text-slate-500 mt-1">5 katoris inside · last opened 4 min ago</p>
