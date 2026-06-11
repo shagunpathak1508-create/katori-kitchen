@@ -18,9 +18,9 @@ export const Route = createFileRoute("/ideas")({
 });
 
 const timing = [
-  { id: "tonight", label: "Use by Tonight", count: 2, color: "tomato" },
-  { id: "tomorrow", label: "Use by Tomorrow", count: 2, color: "amber" },
-  { id: "wait", label: "Can Wait", count: 1, color: "emerald" },
+  { id: "tonight", label: "Use by Tonight", count: 2, badge: "bg-tomato" },
+  { id: "tomorrow", label: "Use by Tomorrow", count: 2, badge: "bg-amber" },
+  { id: "wait", label: "Can Wait", count: 1, badge: "bg-emerald" },
 ];
 
 function IdeasPage() {
@@ -43,7 +43,7 @@ function IdeasPage() {
               >
                 <span className="font-hand text-xl">{t.label}</span>
                 <span
-                  className={`text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full text-white bg-${t.color}`}
+                  className={`text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full text-white ${t.badge}`}
                 >
                   {t.count} katori{t.count !== 1 ? "s" : ""}
                 </span>
