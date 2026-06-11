@@ -16,7 +16,7 @@ export const Route = createFileRoute("/magnets")({
 function MagnetsPage() {
   return (
     <div className="min-h-screen bg-fridge-base overflow-x-hidden">
-      <main className="relative max-w-2xl mx-auto min-h-screen border-x border-white/5 bg-gradient-to-b from-[#161d27] via-[#0f141a] to-[#0a0d12]">
+      <main className="relative max-w-2xl mx-auto min-h-screen border-x border-slate-200 bg-gradient-to-b from-sky-50 via-white to-sky-100/70">
         <Nav />
 
         <section className="brushed-steel relative px-8 py-16 mt-4 mx-2 rounded-md overflow-hidden">
@@ -29,10 +29,10 @@ function MagnetsPage() {
           />
 
           <header className="relative text-center mb-14">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold mb-3">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-bold mb-3">
               The Door
             </p>
-            <h2 className="font-serif italic text-4xl text-white/80">Your Magnet Wall</h2>
+            <h2 className="font-serif italic text-4xl text-slate-800">Your Magnet Wall</h2>
           </header>
 
           {/* Magnet scatter */}
@@ -141,7 +141,7 @@ function MagnetsPage() {
           </div>
         </section>
 
-        <footer className="p-10 text-center border-t border-white/5">
+        <footer className="p-10 text-center border-t border-slate-200">
           <div className="font-serif italic text-lg text-slate-600">Katori</div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-slate-700 mt-1">
             A door covered in small victories.

@@ -26,14 +26,14 @@ const timing = [
 function IdeasPage() {
   return (
     <div className="min-h-screen bg-fridge-base overflow-x-hidden">
-      <main className="relative max-w-2xl mx-auto min-h-screen border-x border-white/5 bg-gradient-to-b from-[#161d27] via-[#0f141a] to-[#0a0d12]">
-        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-sky-400/10 to-transparent pointer-events-none" />
+      <main className="relative max-w-2xl mx-auto min-h-screen border-x border-slate-200 bg-gradient-to-b from-sky-50 via-white to-sky-100/70">
+        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-sky-200/50 to-transparent pointer-events-none" />
         <Nav />
 
         {/* Priority pills */}
         <section className="px-8 pt-8 pb-10">
           <h2 className="font-serif italic text-4xl text-white mb-2">Tonight's Ideas</h2>
-          <p className="text-sm text-slate-400 mb-8">Three pulls from the fridge. One hero. Two alternates.</p>
+          <p className="text-sm text-slate-500 mb-8">Three pulls from the fridge. One hero. Two alternates.</p>
           <div className="space-y-3">
             {timing.map((t, i) => (
               <button
@@ -53,7 +53,7 @@ function IdeasPage() {
         </section>
 
         {/* Transformation */}
-        <section className="px-8 py-10 bg-gradient-to-t from-slate-900/60 to-transparent">
+        <section className="px-8 py-10 bg-gradient-to-t from-sky-100/70 to-transparent">
           <div className="flex items-center gap-4 mb-8">
             <div className="flex -space-x-3">
               <div className="size-12 rounded-full katori-shine p-0.5">
@@ -63,12 +63,12 @@ function IdeasPage() {
                 <img src={rice} alt="" className="w-full h-full rounded-full object-cover" />
               </div>
             </div>
-            <span className="text-sm italic font-serif text-slate-300">
+            <span className="text-sm italic font-serif text-slate-600">
               becomes tonight's hero...
             </span>
           </div>
 
-          <div className="relative overflow-hidden rounded-3xl ring-1 ring-white/10">
+          <div className="relative overflow-hidden rounded-3xl ring-1 ring-slate-200">
             <img
               src={frankie}
               alt="Paneer Frankie Wrap"
@@ -83,11 +83,11 @@ function IdeasPage() {
               <h3 className="font-serif text-5xl italic text-white mb-3 leading-none">
                 Paneer Frankie Wrap
               </h3>
-              <p className="text-slate-300 text-sm max-w-sm mb-2 font-light leading-relaxed">
+              <p className="text-slate-600 text-sm max-w-sm mb-2 font-light leading-relaxed">
                 Uses 1 katori Paneer Bhurji + 2 leftover rotis. Add mint chutney, fresh onions, a dash of chaat masala.
               </p>
               <p className="font-hand text-marigold text-lg mb-6">25 minutes · serves 4</p>
-              <button className="w-full py-4 bg-white text-black font-bold uppercase tracking-[0.2em] text-[11px] rounded-full hover:bg-sky-100 transition-colors">
+              <button className="w-full py-4 bg-slate-900 text-white font-bold uppercase tracking-[0.2em] text-[11px] rounded-full hover:bg-slate-800 transition-colors">
                 Cook This Tonight
               </button>
             </div>
@@ -99,14 +99,14 @@ function IdeasPage() {
           <h3 className="font-serif italic text-2xl text-white mb-6">Or try...</h3>
           <div className="grid grid-cols-2 gap-5">
             <button className="text-left group">
-              <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 mb-3">
+              <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 mb-3">
                 <img src={khichdi} alt="" width={400} height={400} className="aspect-square object-cover group-hover:scale-105 transition-transform" />
               </div>
               <p className="font-serif text-lg text-white leading-tight">Dal Khichdi</p>
               <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-1">2 katoris</p>
             </button>
             <button className="text-left group">
-              <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 mb-3">
+              <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 mb-3">
                 <img src={tikki} alt="" width={400} height={400} className="aspect-square object-cover group-hover:scale-105 transition-transform" />
               </div>
               <p className="font-serif text-lg text-white leading-tight">Aloo Tikki Stack</p>
@@ -146,7 +146,7 @@ function IdeasPage() {
           </div>
         </section>
 
-        <footer className="p-10 text-center border-t border-white/5">
+        <footer className="p-10 text-center border-t border-slate-200">
           <div className="font-serif italic text-lg text-slate-600">Katori</div>
         </footer>
       </main>
