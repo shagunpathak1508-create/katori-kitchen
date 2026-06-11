@@ -26,21 +26,21 @@
 }
 
 :root {
-  --background: oklch(0.18 0.015 240);
-  --foreground: oklch(0.95 0.01 220);
-  --fridge-base: oklch(0.18 0.015 240);
-  --fridge-glow: oklch(0.95 0.025 220);
+  --background: oklch(0.97 0.015 230);
+  --foreground: oklch(0.22 0.03 240);
+  --fridge-base: oklch(0.97 0.015 230);
+  --fridge-glow: oklch(0.99 0.01 225);
   --tape: oklch(0.97 0.025 90);
   --steel: oklch(0.9 0.005 240);
-  --primary: oklch(0.78 0.13 230);
-  --primary-foreground: oklch(0.15 0.02 240);
-  --muted: oklch(0.25 0.02 240);
-  --muted-foreground: oklch(0.7 0.02 230);
-  --border: oklch(1 0 0 / 8%);
-  --ok: oklch(0.72 0.17 155);
-  --warn: oklch(0.78 0.16 75);
-  --danger: oklch(0.65 0.21 28);
-  --marigold: oklch(0.78 0.15 70);
+  --primary: oklch(0.62 0.13 235);
+  --primary-foreground: oklch(0.99 0 0);
+  --muted: oklch(0.92 0.015 230);
+  --muted-foreground: oklch(0.45 0.02 235);
+  --border: oklch(0.22 0.03 240 / 10%);
+  --ok: oklch(0.65 0.16 155);
+  --warn: oklch(0.72 0.16 75);
+  --danger: oklch(0.6 0.21 28);
+  --marigold: oklch(0.72 0.15 70);
   --radius: 0.625rem;
 }
 
@@ -51,14 +51,14 @@
 }
 
 @utility katori-shine {
-  background: conic-gradient(from 180deg at 50% 50%, #94a3b8 0deg, #f1f5f9 45deg, #cbd5e1 90deg, #94a3b8 180deg, #f1f5f9 225deg, #cbd5e1 270deg, #94a3b8 360deg);
-  box-shadow: inset 0 4px 12px rgba(0,0,0,0.35), inset 0 -2px 8px rgba(255,255,255,0.15), 0 14px 35px -10px rgba(0,0,0,0.7);
+  background: conic-gradient(from 180deg at 50% 50%, #c8d3df 0deg, #ffffff 45deg, #dde6ef 90deg, #b8c4d0 180deg, #ffffff 225deg, #dde6ef 270deg, #c8d3df 360deg);
+  box-shadow: inset 0 4px 12px rgba(15,30,60,0.18), inset 0 -2px 8px rgba(255,255,255,0.6), 0 14px 35px -10px rgba(30,60,100,0.25);
 }
 
 @utility glass-shelf {
-  background: linear-gradient(180deg, rgba(232, 244, 244, 0.22) 0%, rgba(232, 244, 244, 0.04) 100%);
-  border-top: 1px solid rgba(232, 244, 244, 0.45);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: linear-gradient(180deg, rgba(180, 210, 235, 0.45) 0%, rgba(220, 235, 248, 0.15) 100%);
+  border-top: 1px solid rgba(120, 160, 200, 0.45);
+  box-shadow: 0 18px 35px -15px rgba(40, 80, 130, 0.35), inset 0 1px 0 rgba(255,255,255,0.7);
   backdrop-filter: blur(4px);
 }
 
@@ -73,6 +73,6 @@
 
 @utility brushed-steel {
   background:
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0px, rgba(0,0,0,0.05) 1px, rgba(255,255,255,0.02) 2px, rgba(0,0,0,0.06) 3px),
-    linear-gradient(135deg, #2a2f33 0%, #3a4045 35%, #2c3236 70%, #404549 100%);
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.5) 0px, rgba(180,200,220,0.25) 1px, rgba(255,255,255,0.4) 2px, rgba(160,185,210,0.3) 3px),
+    linear-gradient(135deg, #dfe8f1 0%, #f0f5fa 35%, #d6e2ee 70%, #eaf2f9 100%);
 }
