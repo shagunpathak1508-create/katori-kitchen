@@ -16,10 +16,19 @@ interface Props {
   rotateIndex?: number;
 }
 
-export function Katori({ image, name, freshness, size = "md", rotateIndex = 0 }: Props) {
+interface KatoriProps extends Props {
+  onClick?: () => void;
+  removing?: boolean;
+}
+
+export function Katori({ image, name, freshness, size = "md", rotateIndex = 0, onClick, removing }: KatoriProps) {
   const dim = size === "lg" ? "size-44" : size === "sm" ? "size-28" : "size-36";
   return (
-    <div className="group cursor-pointer relative">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group cursor-pointer relative bg-transparent border-0 p-0 transition-all duration-500 ${removing ? "opacity-0 translate-y-8 scale-75" : "opacity-100"}`}
+    >
       {/* Freshness dot — sits above the bowl like the reference */}
       <span
         className={`absolute -top-2 left-1/2 -translate-x-1/2 size-2.5 rounded-full ${dot[freshness]} ring-2 ring-white/80 shadow-sm z-10`}
