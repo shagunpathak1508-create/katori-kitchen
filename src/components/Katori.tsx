@@ -64,6 +64,6 @@ export function Katori({ image, name, freshness, size = "md", rotateIndex = 0, o
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
