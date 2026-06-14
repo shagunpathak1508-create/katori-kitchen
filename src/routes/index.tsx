@@ -136,7 +136,7 @@ function FridgePage() {
                 <DialogHeader className="text-center mt-2">
                   <DialogTitle className="font-serif italic text-3xl text-slate-900 text-center">{selected.name}</DialogTitle>
                   <DialogDescription className="text-center text-slate-500">
-                    Added {selected.dateAdded === today() ? "Today" : selected.dateAdded === yesterday() ? "Yesterday" : selected.dateAdded}
+                    {freshnessText(selected.freshness)}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -146,8 +146,8 @@ function FridgePage() {
                   <p className="font-semibold text-slate-900">{selected.count} Katori{selected.count !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Freshness</p>
-                  <p className="font-semibold text-slate-900">{freshnessLabel(selected.freshness)}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Rescue Priority</p>
+                  <p className="font-semibold text-slate-900">{priorityLabel(selected)}</p>
                 </div>
               </div>
               {selected.notes && (
