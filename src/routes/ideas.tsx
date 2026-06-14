@@ -1,121 +1,51 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowDown, Plus, Clock, Users } from "lucide-react";
+import { ArrowDown, Plus, Clock, Users, Flame } from "lucide-react";
 import { Nav } from "@/components/Nav";
-import frankie from "@/assets/dish-frankie.jpg";
-import khichdi from "@/assets/dish-khichdi.jpg";
-import tikki from "@/assets/dish-tikki.jpg";
-import paneer from "@/assets/katori-paneer.png";
-import rice from "@/assets/katori-rice.png";
-import dal from "@/assets/katori-dal.png";
-import chole from "@/assets/katori-chole.png";
+import {
+  useItems,
+  generateRecipes,
+  sortByRescue,
+  priorityLabel,
+  freshnessText,
+  type Cuisine,
+  type Diet,
+} from "@/lib/fridge";
 
 export const Route = createFileRoute("/ideas")({
   head: () => ({
     meta: [
       { title: "Tonight's Ideas — Katori" },
-      { name: "description", content: "Yesterday's katori becomes tonight's meal." },
+      { name: "description", content: "Rescue your most at-risk leftover first." },
       { property: "og:title", content: "Tonight's Ideas — Katori" },
     ],
   }),
   component: IdeasPage,
 });
 
-type Cuisine = "Indian" | "Global";
-type Diet = "Veg" | "Non-Veg" | "Eggitarian" | "Any";
-
-type Recipe = {
-  id: string;
-  title: string;
-  image: string;
-  uses: { label: string; image?: string }[];
-  minutes: number;
-  serves: number;
-  cuisine: Cuisine;
-  diet: Exclude<Diet, "Any">;
-  hero?: boolean;
-};
-
-const RECIPES: Recipe[] = [
-  {
-    id: "frankie",
-    title: "Paneer Frankie Wrap",
-    image: frankie,
-    uses: [
-      { label: "Paneer Bhurji", image: paneer },
-      { label: "2 Rotis" },
-    ],
-    minutes: 25,
-    serves: 4,
-    cuisine: "Indian",
-    diet: "Veg",
-    hero: true,
-  },
-  {
-    id: "khichdi",
-    title: "Dal Khichdi",
-    image: khichdi,
-    uses: [
-      { label: "Dal", image: dal },
-      { label: "Rice", image: rice },
-    ],
-    minutes: 20,
-    serves: 3,
-    cuisine: "Indian",
-    diet: "Veg",
-  },
-  {
-    id: "tikki",
-    title: "Aloo Tikki Stack",
-    image: tikki,
-    uses: [{ label: "Aloo Sabzi" }],
-    minutes: 18,
-    serves: 2,
-    cuisine: "Indian",
-    diet: "Veg",
-  },
-  {
-    id: "burrito",
-    title: "Chole Burrito Bowl",
-    image: frankie,
-    uses: [
-      { label: "Chole", image: chole },
-      { label: "Rice", image: rice },
-    ],
-    minutes: 22,
-    serves: 3,
-    cuisine: "Global",
-    diet: "Veg",
-  },
-  {
-    id: "omelette",
-    title: "Masala Egg Roll",
-    image: tikki,
-    uses: [{ label: "2 Rotis" }, { label: "Eggs" }],
-    minutes: 15,
-    serves: 2,
-    cuisine: "Indian",
-    diet: "Eggitarian",
-  },
-];
-
 const CUISINES: Cuisine[] = ["Indian", "Global"];
 const DIETS: Diet[] = ["Veg", "Non-Veg", "Eggitarian", "Any"];
 
+const toneClass = (p: "High" | "Medium" | "Low") =>
+  p === "High"
+    ? "bg-tomato/15 text-tomato ring-tomato/30"
+    : p === "Medium"
+      ? "bg-amber/20 text-amber-700 ring-amber/40"
+      : "bg-emerald/15 text-emerald-700 ring-emerald/30";
+
 function IdeasPage() {
+  const items = useItems();
   const [cuisine, setCuisine] = useState<Cuisine>("Indian");
   const [diet, setDiet] = useState<Diet>("Veg");
 
-  const filtered = useMemo(
-    () =>
-      RECIPES.filter(
-        (r) => r.cuisine === cuisine && (diet === "Any" || r.diet === diet),
-      ),
-    [cuisine, diet],
+  const recipes = useMemo(
+    () => generateRecipes(items, cuisine, diet),
+    [items, cuisine, diet],
   );
-
-  const hero = filtered.find((r) => r.hero) ?? filtered[0];
-  const alternates = filtered.filter((r) => r.id !== hero?.id).slice(0, 4);
+  const prioritized = useMemo(() => sortByRescue(items), [items]);
+  const hero = recipes.find((r) => r.hero) ?? recipes[0];
+  const heroItem = hero ? items.find((i) => i.id === hero.fromItemId) : null;
+  const alternates = recipes.filter((r) => r.id !== hero?.id).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-fridge-base overflow-x-hidden">
@@ -129,7 +59,7 @@ function IdeasPage() {
             Tonight's Ideas
           </h1>
           <p className="text-sm text-slate-500 mb-7 font-sans">
-            Three pulls from the fridge, reimagined.
+            Rescuing your most at-risk leftover first.
           </p>
 
           <FilterGroup
@@ -147,19 +77,51 @@ function IdeasPage() {
           />
         </section>
 
-        {/* Hero Recommendation — image first, text below */}
-        {hero && (
+        {/* Priority queue strip */}
+        {prioritized.length > 0 && (
+          <section className="px-8 pb-6">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-3 font-sans">
+              Rescue queue
+            </p>
+            <ul className="flex gap-2 overflow-x-auto -mx-2 px-2 pb-1">
+              {prioritized.map((it) => {
+                const p = priorityLabel(it);
+                return (
+                  <li
+                    key={it.id}
+                    className={`shrink-0 flex items-center gap-2 rounded-full ring-1 px-3 py-1.5 ${toneClass(p)}`}
+                  >
+                    <img src={it.image} alt="" className="size-6 rounded-full object-cover" />
+                    <span className="text-xs font-semibold">{it.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-80">· {p}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {/* Hero Recommendation */}
+        {hero && heroItem && (
           <section className="px-8 pb-10">
-            <span className="text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold font-sans">
-              Hero Tonight
-            </span>
-            <article className="mt-3 rounded-3xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-[0_24px_50px_-24px_rgba(30,70,120,0.35)]">
+            <div className="flex items-center gap-2 mb-3">
+              <Flame className="size-3.5 text-tomato" />
+              <span className="text-[10px] uppercase tracking-[0.25em] text-slate-600 font-semibold font-sans">
+                Hero — rescuing {heroItem.name}
+              </span>
+            </div>
+            <article className="rounded-3xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-[0_24px_50px_-24px_rgba(30,70,120,0.35)]">
               <img
                 src={hero.image}
                 alt={hero.title}
                 className="w-full aspect-[4/3] object-cover"
               />
               <div className="p-6">
+                <div
+                  className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold ring-1 px-2.5 py-1 rounded-full mb-3 ${toneClass(priorityLabel(heroItem))}`}
+                >
+                  {priorityLabel(heroItem)} priority · {freshnessText(heroItem.freshness)}
+                </div>
                 <h2 className="font-serif text-3xl text-slate-900 leading-tight">
                   {hero.title}
                 </h2>
@@ -267,10 +229,10 @@ function IdeasPage() {
           </section>
         )}
 
-        {filtered.length === 0 && (
+        {recipes.length === 0 && (
           <section className="px-8 pb-16 text-center">
             <p className="font-serif italic text-xl text-slate-600">
-              No ideas match yet — try another filter.
+              Your fridge is empty — add a katori to get ideas.
             </p>
           </section>
         )}
