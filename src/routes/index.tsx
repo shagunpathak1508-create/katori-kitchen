@@ -13,11 +13,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import paneer from "@/assets/katori-paneer.png";
-import dal from "@/assets/katori-dal.png";
-import rice from "@/assets/katori-rice.png";
-import aloo from "@/assets/katori-aloo.png";
-import chole from "@/assets/katori-chole.png";
+import {
+  useItems,
+  setItems,
+  imagePool,
+  freshnessText,
+  priorityLabel,
+  type Item,
+} from "@/lib/fridge";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,43 +33,8 @@ export const Route = createFileRoute("/")({
   component: FridgePage,
 });
 
-type Freshness = "fresh" | "soon" | "tonight";
-type Item = {
-  id: string;
-  name: string;
-  image: string;
-  freshness: Freshness;
-  qty: string;
-  count: number;
-  dateAdded: string;
-  notes?: string;
-  size: "sm" | "md" | "lg";
-  shelf: 0 | 1 | 2;
-};
-
-const today = () => new Date().toISOString().slice(0, 10);
-const yesterday = () => {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-};
-
-const initialItems: Item[] = [
-  { id: "1", name: "Paneer Bhurji", image: paneer, freshness: "fresh", qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "lg", shelf: 0 },
-  { id: "2", name: "Dal Tadka",     image: dal,    freshness: "soon",  qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "md", shelf: 0 },
-  { id: "3", name: "Jeera Rice",    image: rice,   freshness: "fresh", qty: "1 bowl", count: 1, dateAdded: today(),     size: "md", shelf: 1 },
-  { id: "4", name: "Chole",         image: chole,  freshness: "tonight", qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "lg", shelf: 1 },
-  { id: "5", name: "Aloo Fry",      image: aloo,   freshness: "soon",  qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "md", shelf: 2 },
-];
-
-const imagePool = [paneer, dal, rice, aloo, chole];
-
-function freshnessLabel(f: Freshness) {
-  return f === "fresh" ? "Fresh — eat within 2 days" : f === "soon" ? "Use by Tomorrow" : "Use by Tonight";
-}
-
 function FridgePage() {
-  const [items, setItems] = useState<Item[]>(initialItems);
+  const items = useItems();
   const [removing, setRemoving] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -168,7 +136,7 @@ function FridgePage() {
                 <DialogHeader className="text-center mt-2">
                   <DialogTitle className="font-serif italic text-3xl text-slate-900 text-center">{selected.name}</DialogTitle>
                   <DialogDescription className="text-center text-slate-500">
-                    Added {selected.dateAdded === today() ? "Today" : selected.dateAdded === yesterday() ? "Yesterday" : selected.dateAdded}
+                    {freshnessText(selected.freshness)}
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -178,8 +146,8 @@ function FridgePage() {
                   <p className="font-semibold text-slate-900">{selected.count} Katori{selected.count !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Freshness</p>
-                  <p className="font-semibold text-slate-900">{freshnessLabel(selected.freshness)}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Rescue Priority</p>
+                  <p className="font-semibold text-slate-900">{priorityLabel(selected)}</p>
                 </div>
               </div>
               {selected.notes && (
