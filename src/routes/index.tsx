@@ -16,11 +16,15 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useItems,
   setItems,
-  imagePool,
   freshnessText,
   priorityLabel,
+  itemFreshness,
+  discardItem,
   type Item,
+  type Category,
 } from "@/lib/fridge";
+import { getKatoriImage } from "@/lib/imageRegistry";
+import { logFoodSelected, logItemsMutated } from "@/lib/debug";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,6 +37,8 @@ export const Route = createFileRoute("/")({
   component: FridgePage,
 });
 
+const CATEGORIES: Category[] = ["Paneer", "Dal", "Rice", "Chole", "Curry", "Sabzi", "Other"];
+
 function FridgePage() {
   const items = useItems();
   const [removing, setRemoving] = useState<string | null>(null);
@@ -43,13 +49,20 @@ function FridgePage() {
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
+  // Log food selection for debugging
+  const handleSelect = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item) logFoodSelected(item);
+    setSelectedId(id);
+  };
+
   const handleDiscard = () => {
     if (!selected) return;
     setRemoving(selected.id);
     setConfirmDiscard(false);
     setSelectedId(null);
     setTimeout(() => {
-      setItems((prev) => prev.filter((i) => i.id !== selected.id));
+      discardItem(selected.id);
       setRemoving(null);
     }, 500);
   };
@@ -81,11 +94,11 @@ function FridgePage() {
                     key={it.id}
                     image={it.image}
                     name={it.name}
-                    freshness={it.freshness}
+                    freshness={itemFreshness(it)}
                     size={it.size}
                     rotateIndex={i}
                     removing={removing === it.id}
-                    onClick={() => setSelectedId(it.id)}
+                    onClick={() => handleSelect(it.id)}
                   />
                 ))}
                 {idx === 2 && (
@@ -136,17 +149,21 @@ function FridgePage() {
                 <DialogHeader className="text-center mt-2">
                   <DialogTitle className="font-serif italic text-3xl text-slate-900 text-center">{selected.name}</DialogTitle>
                   <DialogDescription className="text-center text-slate-500">
-                    {freshnessText(selected.freshness)}
+                    {freshnessText(itemFreshness(selected))}
                   </DialogDescription>
                 </DialogHeader>
               </div>
-              <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
+              <div className="grid grid-cols-3 gap-3 mt-2 text-sm">
                 <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
                   <p className="text-[10px] uppercase tracking-widest text-slate-500">Remaining</p>
                   <p className="font-semibold text-slate-900">{selected.count} Katori{selected.count !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Rescue Priority</p>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Category</p>
+                  <p className="font-semibold text-slate-900">{selected.category}</p>
+                </div>
+                <div className="rounded-xl bg-sky-50 border border-sky-100 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Priority</p>
                   <p className="font-semibold text-slate-900">{priorityLabel(selected)}</p>
                 </div>
               </div>
@@ -168,7 +185,7 @@ function FridgePage() {
                 </button>
                 <button
                   onClick={() => setConfirmDiscard(true)}
-                  className="py-3 rounded-full bg-tomato/10 border border-tomato/30 text-tomato text-xs font-bold uppercase tracking-wider hover:bg-tomato/20"
+                  className="py-3 rounded-full bg-tomato/10 border border-tomato/30 text-xs font-bold uppercase tracking-wider hover:bg-tomato/20"
                   style={{ color: "var(--danger)" }}
                 >
                   🗑 Discard
@@ -215,15 +232,16 @@ function FridgePage() {
           const newItem: Item = {
             id: crypto.randomUUID(),
             name: data.name,
-            image: imagePool[items.length % imagePool.length],
-            freshness: "fresh",
+            image: getKatoriImage(data.name, data.category),
             qty: data.qty,
             count: data.count,
             dateAdded: data.dateAdded,
+            category: data.category,
             notes: data.notes,
             size: "md",
-            shelf: items.length % 3 === 2 ? 2 : (items.length % 3 as 0 | 1),
+            shelf: 0 as 0 | 1 | 2, // will be corrected by rebalanceShelves
           };
+          logItemsMutated("add", { name: data.name, category: data.category, image: newItem.image });
           setItems((prev) => [...prev, newItem]);
           setAddOpen(false);
         }}
@@ -237,10 +255,20 @@ function FridgePage() {
           title="Edit Katori"
           initial={selected}
           onSave={(data) => {
+            logItemsMutated("edit", { id: selected.id, name: data.name, category: data.category });
             setItems((prev) =>
               prev.map((i) =>
                 i.id === selected.id
-                  ? { ...i, name: data.name, qty: data.qty, count: data.count, dateAdded: data.dateAdded, notes: data.notes }
+                  ? {
+                      ...i,
+                      name: data.name,
+                      qty: data.qty,
+                      count: data.count,
+                      dateAdded: data.dateAdded,
+                      category: data.category,
+                      notes: data.notes,
+                      image: getKatoriImage(data.name, data.category),
+                    }
                   : i
               )
             );
@@ -263,28 +291,26 @@ function AddOrEditDialog({
   onOpenChange: (o: boolean) => void;
   title: string;
   initial?: Partial<Item>;
-  onSave: (d: { name: string; qty: string; count: number; dateAdded: string; notes?: string }) => void;
+  onSave: (d: { name: string; qty: string; count: number; dateAdded: string; category: Category; notes?: string }) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [qty, setQty] = useState(initial?.qty ?? "1 bowl");
   const [count, setCount] = useState(initial?.count ?? 1);
   const [dateAdded, setDateAdded] = useState(initial?.dateAdded ?? new Date().toISOString().slice(0, 10));
+  const [category, setCategory] = useState<Category>(initial?.category ?? "Other");
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
+  const handleOpen = (o: boolean) => {
+    onOpenChange(o);
+    if (o && !initial) {
+      setName(""); setQty("1 bowl"); setCount(1);
+      setDateAdded(new Date().toISOString().slice(0, 10));
+      setCategory("Other"); setNotes("");
+    }
+  };
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        if (o && !initial) {
-          setName("");
-          setQty("1 bowl");
-          setCount(1);
-          setDateAdded(new Date().toISOString().slice(0, 10));
-          setNotes("");
-        }
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpen}>
       <DialogContent className="bg-white">
         <DialogHeader>
           <DialogTitle className="font-serif italic text-2xl text-slate-900">✍️ {title}</DialogTitle>
@@ -297,6 +323,29 @@ function AddOrEditDialog({
             <Label className="text-xs uppercase tracking-wider text-slate-500">Food Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Paneer Bhurji" className="border-slate-300" />
           </div>
+
+          {/* Category */}
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wider text-slate-500">Category</Label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className={
+                    "px-3 py-1 rounded-full text-xs font-semibold ring-1 transition-colors " +
+                    (category === cat
+                      ? "bg-slate-900 text-white ring-slate-900"
+                      : "bg-white text-slate-600 ring-slate-200 hover:ring-slate-400")
+                  }
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs uppercase tracking-wider text-slate-500">Quantity</Label>
@@ -313,6 +362,7 @@ function AddOrEditDialog({
               />
             </div>
           </div>
+
           <div className="space-y-1">
             <Label className="text-xs uppercase tracking-wider text-slate-500">Date Added</Label>
             <Input type="date" value={dateAdded} onChange={(e) => setDateAdded(e.target.value)} className="border-slate-300" />
@@ -331,7 +381,7 @@ function AddOrEditDialog({
           </button>
           <button
             disabled={!name.trim()}
-            onClick={() => onSave({ name: name.trim(), qty, count, dateAdded, notes: notes.trim() || undefined })}
+            onClick={() => onSave({ name: name.trim(), qty, count, dateAdded, category, notes: notes.trim() || undefined })}
             className="flex-1 py-3 rounded-full bg-slate-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-800 disabled:opacity-40"
           >
             Save

@@ -1,84 +1,102 @@
 import { useSyncExternalStore } from "react";
-import paneer from "@/assets/katori-paneer.png";
-import dal from "@/assets/katori-dal.png";
-import rice from "@/assets/katori-rice.png";
-import aloo from "@/assets/katori-aloo.png";
-import chole from "@/assets/katori-chole.png";
+import { getKatoriImage, getRecipeImage } from "@/lib/imageRegistry";
+import { logItemsMutated, logRecipeGenerated, logShelfRebalance } from "@/lib/debug";
 
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
 export type Freshness = "fresh" | "soon" | "tonight";
 export type Cuisine = "Indian" | "Global";
 export type Diet = "Veg" | "Non-Veg" | "Eggitarian" | "Any";
+export type Category =
+  | "Paneer"
+  | "Dal"
+  | "Rice"
+  | "Chole"
+  | "Curry"
+  | "Sabzi"
+  | "Other";
 
 export type Item = {
   id: string;
   name: string;
   image: string;
-  freshness: Freshness;
   qty: string;
   count: number;
-  dateAdded: string;
+  dateAdded: string; // ISO date string, e.g. "2024-06-15"
+  category: Category;
   notes?: string;
   size: "sm" | "md" | "lg";
   shelf: 0 | 1 | 2;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
-const yesterday = () => {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+// ─────────────────────────────────────────────
+// Freshness Engine — Rule-Based Lookup Table (NO AI)
+// ─────────────────────────────────────────────
+// greenDays:  0..greenDays  → "fresh"
+// yellowDays: greenDays+1..yellowDays → "soon"
+// red:        yellowDays+1+           → "tonight"
+type FreshnessRule = { greenDays: number; yellowDays: number };
+
+export const FRESHNESS_RULES: Record<Category, FreshnessRule> = {
+  Paneer: { greenDays: 1, yellowDays: 2 }, // 0-1 fresh | 2 soon | 3+ tonight
+  Dal:    { greenDays: 2, yellowDays: 3 }, // 0-2 fresh | 3 soon | 4+ tonight
+  Rice:   { greenDays: 1, yellowDays: 2 }, // 0-1 fresh | 2 soon | 3+ tonight
+  Chole:  { greenDays: 1, yellowDays: 2 }, // 0-1 fresh | 2 soon | 3+ tonight
+  Curry:  { greenDays: 1, yellowDays: 2 }, // 0-1 fresh | 2 soon | 3+ tonight
+  Sabzi:  { greenDays: 2, yellowDays: 3 }, // 0-2 fresh | 3 soon | 4+ tonight
+  Other:  { greenDays: 2, yellowDays: 3 }, // default fallback
 };
 
-export const imagePool = [paneer, dal, rice, aloo, chole];
+/** Compute freshness from category + dateAdded. No AI required. */
+export function computeFreshness(category: Category, dateAdded: string): Freshness {
+  const added = new Date(dateAdded);
+  const now = new Date();
+  // Compare calendar days only, not time-of-day
+  const addedDay = Date.UTC(added.getFullYear(), added.getMonth(), added.getDate());
+  const todayDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const ageInDays = Math.floor((todayDay - addedDay) / (1000 * 60 * 60 * 24));
 
-const INITIAL: Item[] = [
-  { id: "1", name: "Paneer Bhurji", image: paneer, freshness: "fresh", qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "lg", shelf: 0 },
-  { id: "2", name: "Dal Tadka",     image: dal,    freshness: "soon",  qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "md", shelf: 0 },
-  { id: "3", name: "Jeera Rice",    image: rice,   freshness: "fresh", qty: "1 bowl", count: 1, dateAdded: today(),     size: "md", shelf: 1 },
-  { id: "4", name: "Chole",         image: chole,  freshness: "tonight", qty: "2 bowls", count: 2, dateAdded: yesterday(), size: "lg", shelf: 1 },
-  { id: "5", name: "Aloo Fry",      image: aloo,   freshness: "soon",  qty: "1 bowl", count: 1, dateAdded: yesterday(), size: "md", shelf: 2 },
-];
-
-let items: Item[] = INITIAL;
-const listeners = new Set<() => void>();
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => listeners.delete(l);
-};
-const snapshot = () => items;
-
-export function setItems(updater: (prev: Item[]) => Item[]) {
-  items = updater(items);
-  listeners.forEach((l) => l());
+  const rule = FRESHNESS_RULES[category] ?? FRESHNESS_RULES.Other;
+  if (ageInDays <= rule.greenDays) return "fresh";
+  if (ageInDays <= rule.yellowDays) return "soon";
+  return "tonight";
 }
 
-export function useItems() {
-  return useSyncExternalStore(subscribe, snapshot, snapshot);
+/** Get freshness for an item — convenience wrapper */
+export function itemFreshness(item: Item): Freshness {
+  return computeFreshness(item.category, item.dateAdded);
 }
 
-/* ───────────── Freshness language ───────────── */
+// ─────────────────────────────────────────────
+// Freshness Display Helpers
+// ─────────────────────────────────────────────
 export function freshnessText(f: Freshness): string {
-  if (f === "tonight") return "Best used tonight";
-  if (f === "soon") return "Best used tomorrow";
-  return "Safe for 3 more days";
+  if (f === "tonight") return "Use Tonight";
+  if (f === "soon") return "Use Soon";
+  return "Fresh";
 }
 
 export function freshnessTone(f: Freshness): "red" | "amber" | "green" {
   return f === "tonight" ? "red" : f === "soon" ? "amber" : "green";
 }
 
-/* ───────────── Rescue Priority Engine ───────────── */
-// Higher score = more urgent to rescue.
+// ─────────────────────────────────────────────
+// Priority Engine — Spec Formula (NO AI)
+// ─────────────────────────────────────────────
+// Freshness Weight: Red = +100, Yellow = +50, Green = +10
+// Quantity Weight:  1 katori = +10, 2 = +20, 3+ = +30
 export function priorityScore(item: Item): number {
-  const freshnessWeight: Record<Freshness, number> = { tonight: 3, soon: 2, fresh: 1 };
-  const valueWeight = Math.max(1, item.count); // estimated food value via qty
-  return freshnessWeight[item.freshness] * 10 + valueWeight;
+  const f = itemFreshness(item);
+  const freshnessWeight = f === "tonight" ? 100 : f === "soon" ? 50 : 10;
+  const qtyWeight = item.count >= 3 ? 30 : item.count === 2 ? 20 : 10;
+  return freshnessWeight + qtyWeight;
 }
 
 export function priorityLabel(item: Item): "High" | "Medium" | "Low" {
   const s = priorityScore(item);
-  if (s >= 30) return "High";
-  if (s >= 20) return "Medium";
+  if (s >= 110) return "High";
+  if (s >= 60) return "Medium";
   return "Low";
 }
 
@@ -86,16 +104,136 @@ export function sortByRescue(list: Item[]): Item[] {
   return [...list].sort((a, b) => priorityScore(b) - priorityScore(a));
 }
 
-/* ───────────── AI Transformation Engine ───────────── */
-import frankie from "@/assets/dish-frankie.jpg";
-import khichdi from "@/assets/dish-khichdi.jpg";
-import tikki from "@/assets/dish-tikki.jpg";
+// ─────────────────────────────────────────────
+// Seed / Initial Data
+// ─────────────────────────────────────────────
+const today = () => new Date().toISOString().slice(0, 10);
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+};
 
-const DISH_IMAGES = [frankie, khichdi, tikki];
+const SEED: Item[] = [
+  { id: "1", name: "Paneer Bhurji", image: getKatoriImage("Paneer Bhurji", "Paneer"), qty: "1 bowl", count: 1, dateAdded: daysAgo(1), category: "Paneer", size: "lg", shelf: 0 },
+  { id: "2", name: "Dal Tadka",     image: getKatoriImage("Dal Tadka", "Dal"),       qty: "1 bowl", count: 1, dateAdded: daysAgo(2), category: "Dal",    size: "md", shelf: 0 },
+  { id: "3", name: "Jeera Rice",    image: getKatoriImage("Jeera Rice", "Rice"),     qty: "1 bowl", count: 1, dateAdded: today(),    category: "Rice",   size: "md", shelf: 1 },
+  { id: "4", name: "Chole",         image: getKatoriImage("Chole", "Chole"),         qty: "2 bowls", count: 2, dateAdded: daysAgo(2), category: "Chole", size: "lg", shelf: 1 },
+  { id: "5", name: "Aloo Fry",      image: getKatoriImage("Aloo Fry", "Sabzi"),     qty: "1 bowl", count: 1, dateAdded: daysAgo(1), category: "Sabzi", size: "md", shelf: 2 },
+];
+
+// ─────────────────────────────────────────────
+// Shelf Layout System
+// ─────────────────────────────────────────────
+const SHELF_CAPACITY = 3;
+
+/**
+ * Auto-rearrange items across shelves.
+ * - Distributes items evenly across 3 shelves (max SHELF_CAPACITY each)
+ * - Assigns size based on how many items share a shelf
+ * - Rehydrates images from the registry (fixes stale localStorage images)
+ */
+export function rebalanceShelves(list: Item[]): Item[] {
+  // Sort by dateAdded (oldest first → top shelf)
+  const sorted = [...list].sort(
+    (a, b) => new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime(),
+  );
+
+  // Assign shelves round-robin
+  const shelves: Item[][] = [[], [], []];
+  sorted.forEach((item, idx) => {
+    const shelfIdx = Math.min(Math.floor(idx / SHELF_CAPACITY), 2) as 0 | 1 | 2;
+    shelves[shelfIdx].push(item);
+  });
+
+  // Flatten back with updated shelf + size + rehydrated image
+  const result: Item[] = [];
+  shelves.forEach((shelf, shelfIdx) => {
+    const size: "sm" | "md" | "lg" = shelf.length === 1 ? "lg" : "md";
+    shelf.forEach((item) => {
+      result.push({
+        ...item,
+        shelf: shelfIdx as 0 | 1 | 2,
+        size,
+        image: getKatoriImage(item.name, item.category),
+      });
+    });
+  });
+
+  logShelfRebalance(result.map((i) => ({ id: i.id, name: i.name, shelf: i.shelf, size: i.size })));
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// Store with localStorage Persistence
+// ─────────────────────────────────────────────
+const LS_KEY = "katori:fridge";
+
+function loadItems(): Item[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Item[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Rehydrate images from registry on load (fixes stale localStorage)
+        return rebalanceShelves(
+          parsed.map((item) => ({
+            ...item,
+            image: getKatoriImage(item.name, item.category),
+          })),
+        );
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return rebalanceShelves(SEED);
+}
+
+function saveItems(list: Item[]) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(list));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let items: Item[] = loadItems();
+const listeners = new Set<() => void>();
+
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => listeners.delete(l);
+};
+const snapshot = () => items;
+
+export function setItems(updater: (prev: Item[]) => Item[]) {
+  const updated = updater(items);
+  // Auto-rebalance shelves on every mutation
+  items = rebalanceShelves(updated);
+  logItemsMutated("rebalance", { count: items.length, items: items.map((i) => i.name) });
+  saveItems(items);
+  listeners.forEach((l) => l());
+}
+
+export function useItems() {
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
+/** Remove an item — used by discard (does NOT credit impact). */
+export function discardItem(id: string, onRemoved?: () => void) {
+  logItemsMutated("discard", { id });
+  setItems((prev) => prev.filter((i) => i.id !== id));
+  onRemoved?.();
+}
+
+// ─────────────────────────────────────────────
+// Static Recipe Generation (Fallback — NO AI)
+// ─────────────────────────────────────────────
 
 type Transform = { indian: string[]; global: string[]; pairs?: string[] };
 
-const TRANSFORMS: Record<string, Transform> = {
+export const TRANSFORMS: Record<string, Transform> = {
   Chole: {
     indian: ["Chole Kulcha", "Chole Paratha", "Chole Tikki"],
     global: ["Chole Quesadilla", "Chole Tacos", "Chole Burger Patty"],
@@ -128,7 +266,16 @@ const FALLBACK: Transform = {
   global: ["Grilled Wrap", "Stuffed Pita", "Open Toast"],
 };
 
-const dietOk = (_name: string, diet: Diet) => diet === "Any" || diet !== "Non-Veg";
+const STATIC_STEPS: Record<string, string[]> = {
+  default: [
+    "Gather your leftover and any additional pantry ingredients.",
+    "Heat a tawa or pan on medium flame with a drizzle of oil.",
+    "Add your leftover and mix in the complementary ingredients.",
+    "Season with salt, chaat masala, or herbs to taste.",
+    "Cook until heated through and fragrant, about 5–7 minutes.",
+    "Plate and serve hot with chutney or curd on the side.",
+  ],
+};
 
 export type GeneratedRecipe = {
   id: string;
@@ -140,6 +287,7 @@ export type GeneratedRecipe = {
   cuisine: Cuisine;
   hero?: boolean;
   fromItemId: string;
+  steps: string[];
 };
 
 export function generateRecipes(
@@ -151,14 +299,15 @@ export function generateRecipes(
   const out: GeneratedRecipe[] = [];
   sorted.forEach((item, idx) => {
     const t = TRANSFORMS[item.name] ?? FALLBACK;
-    const titles = (cuisine === "Indian" ? t.indian : t.global).filter((n) =>
-      dietOk(n, diet),
+    const titles = (cuisine === "Indian" ? t.indian : t.global).filter(() =>
+      diet !== "Non-Veg",
     );
     titles.slice(0, idx === 0 ? 3 : 1).forEach((title, j) => {
-      out.push({
+      const recipeImage = getRecipeImage(title);
+      const recipe: GeneratedRecipe = {
         id: `${item.id}-${j}`,
         title,
-        image: DISH_IMAGES[(idx + j) % DISH_IMAGES.length],
+        image: recipeImage,
         uses: [
           { label: `${item.count} Katori ${item.name}`, image: item.image },
           ...(t.pairs ? [{ label: t.pairs[j % t.pairs.length] }] : []),
@@ -168,7 +317,10 @@ export function generateRecipes(
         cuisine,
         hero: idx === 0 && j === 0,
         fromItemId: item.id,
-      });
+        steps: STATIC_STEPS[title] ?? STATIC_STEPS.default,
+      };
+      logRecipeGenerated(recipe);
+      out.push(recipe);
     });
   });
   return out;

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as MagnetsRouteImport } from './routes/magnets'
 import { Route as IdeasRouteImport } from './routes/ideas'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RecipeRecipeIdRouteImport } from './routes/recipe.$recipeId'
 
 const MagnetsRoute = MagnetsRouteImport.update({
   id: '/magnets',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecipeRecipeIdRoute = RecipeRecipeIdRouteImport.update({
+  id: '/recipe/$recipeId',
+  path: '/recipe/$recipeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ideas': typeof IdeasRoute
   '/magnets': typeof MagnetsRoute
+  '/recipe/$recipeId': typeof RecipeRecipeIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ideas': typeof IdeasRoute
   '/magnets': typeof MagnetsRoute
+  '/recipe/$recipeId': typeof RecipeRecipeIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ideas': typeof IdeasRoute
   '/magnets': typeof MagnetsRoute
+  '/recipe/$recipeId': typeof RecipeRecipeIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ideas' | '/magnets'
+  fullPaths: '/' | '/ideas' | '/magnets' | '/recipe/$recipeId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ideas' | '/magnets'
-  id: '__root__' | '/' | '/ideas' | '/magnets'
+  to: '/' | '/ideas' | '/magnets' | '/recipe/$recipeId'
+  id: '__root__' | '/' | '/ideas' | '/magnets' | '/recipe/$recipeId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   IdeasRoute: typeof IdeasRoute
   MagnetsRoute: typeof MagnetsRoute
+  RecipeRecipeIdRoute: typeof RecipeRecipeIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recipe/$recipeId': {
+      id: '/recipe/$recipeId'
+      path: '/recipe/$recipeId'
+      fullPath: '/recipe/$recipeId'
+      preLoaderRoute: typeof RecipeRecipeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,7 +106,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   IdeasRoute: IdeasRoute,
   MagnetsRoute: MagnetsRoute,
+  RecipeRecipeIdRoute: RecipeRecipeIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

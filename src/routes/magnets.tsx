@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { Nav } from "@/components/Nav";
+import { useImpact, getMagnetData, type MagnetDef } from "@/lib/impact";
 
 export const Route = createFileRoute("/magnets")({
   head: () => ({
@@ -15,26 +16,6 @@ export const Route = createFileRoute("/magnets")({
 
 type MagnetStyle = "tomato" | "emerald" | "amber" | "slate" | "marigold" | "sky";
 
-type MagnetDef = {
-  id: string;
-  emoji: string;
-  label: string;
-  sub?: string;
-  shape: "round" | "square" | "hex";
-  color: MagnetStyle;
-  x: number; // % of board
-  y: number; // % of board
-  rot: number;
-};
-
-const INITIAL: MagnetDef[] = [
-  { id: "streak", emoji: "🔥", label: "7 Day", sub: "Streak", shape: "square", color: "tomato", x: 12, y: 8, rot: -6 },
-  { id: "saved", emoji: "🥣", label: "42", sub: "Katoris Saved", shape: "round", color: "emerald", x: 60, y: 6, rot: 8 },
-  { id: "money", emoji: "💰", label: "₹1,240", sub: "Saved", shape: "round", color: "marigold", x: 14, y: 40, rot: 4 },
-  { id: "waste", emoji: "🌱", label: "18kg", sub: "Waste Prevented", shape: "hex", color: "sky", x: 58, y: 38, rot: -4 },
-  { id: "zero", emoji: "♻", label: "Zero Waste", sub: "Week", shape: "square", color: "slate", x: 30, y: 70, rot: -2 },
-];
-
 const colorClass: Record<MagnetStyle, string> = {
   tomato: "bg-tomato text-white",
   emerald: "bg-emerald text-white",
@@ -45,7 +26,14 @@ const colorClass: Record<MagnetStyle, string> = {
 };
 
 function MagnetsPage() {
-  const [magnets, setMagnets] = useState<MagnetDef[]>(INITIAL);
+  const impact = useImpact();
+  const liveMagnets = getMagnetData(impact);
+
+  // Local drag positions (UI state — not persisted)
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(
+    () => Object.fromEntries(liveMagnets.map((m) => [m.id, { x: m.x, y: m.y }])),
+  );
+
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     id: string;
@@ -54,13 +42,13 @@ function MagnetsPage() {
     rect: DOMRect;
   } | null>(null);
 
-  const onPointerDown = (e: RPointerEvent<HTMLDivElement>, m: MagnetDef) => {
+  const onPointerDown = (e: RPointerEvent<HTMLDivElement>, id: string) => {
     const board = boardRef.current;
     if (!board) return;
     const rect = board.getBoundingClientRect();
     const magnetRect = e.currentTarget.getBoundingClientRect();
     dragRef.current = {
-      id: m.id,
+      id,
       offsetX: e.clientX - magnetRect.left,
       offsetY: e.clientY - magnetRect.top,
       rect,
@@ -75,17 +63,35 @@ function MagnetsPage() {
     const py = e.clientY - d.rect.top - d.offsetY;
     const x = Math.max(0, Math.min(85, (px / d.rect.width) * 100));
     const y = Math.max(0, Math.min(90, (py / d.rect.height) * 100));
-    setMagnets((prev) => prev.map((m) => (m.id === d.id ? { ...m, x, y } : m)));
+    setPositions((prev) => ({ ...prev, [d.id]: { x, y } }));
   };
 
-  const onPointerUp = () => {
-    dragRef.current = null;
-  };
+  const onPointerUp = () => { dragRef.current = null; };
+
+  // Sync new magnets that appear (e.g., zero-waste week badge after streak hits 7)
+  const knownIds = Object.keys(positions);
+  const newMagnets = liveMagnets.filter((m) => !knownIds.includes(m.id));
+  if (newMagnets.length > 0) {
+    setPositions((prev) => ({
+      ...prev,
+      ...Object.fromEntries(newMagnets.map((m) => [m.id, { x: m.x, y: m.y }])),
+    }));
+  }
 
   return (
     <div className="min-h-screen bg-fridge-base overflow-x-hidden">
       <main className="relative max-w-2xl mx-auto min-h-screen border-x border-slate-200 bg-gradient-to-b from-sky-50 via-white to-sky-100/70">
         <Nav />
+
+        {/* Stats summary strip */}
+        <section className="px-8 pb-2 pt-2">
+          <div className="grid grid-cols-4 gap-2">
+            <StatCard emoji="🔥" value={`${impact.currentStreak}d`} label="Streak" color="tomato" />
+            <StatCard emoji="🥣" value={String(impact.katorisSaved)} label="Saved" color="emerald" />
+            <StatCard emoji="💰" value={`₹${impact.moneySaved}`} label="Money" color="marigold" />
+            <StatCard emoji="🌱" value={`${impact.wastePrevented}kg`} label="Waste" color="sky" />
+          </div>
+        </section>
 
         {/* Brushed steel fridge door */}
         <section
@@ -126,23 +132,35 @@ function MagnetsPage() {
             <p className="text-[11px] text-slate-600 mt-1 font-sans">Drag to arrange</p>
           </header>
 
-          {/* Magnets */}
-          {magnets.map((m) => (
-            <div
-              key={m.id}
-              onPointerDown={(e) => onPointerDown(e, m)}
-              className="absolute cursor-grab active:cursor-grabbing"
-              style={{
-                left: `${m.x}%`,
-                top: `${m.y}%`,
-                transform: `rotate(${m.rot}deg)`,
-                filter: "drop-shadow(0 8px 10px rgba(0,0,0,0.28))",
-                touchAction: "none",
-              }}
-            >
-              <MagnetVisual m={m} />
+          {/* Empty state */}
+          {impact.katorisSaved === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="font-serif italic text-slate-500 text-center px-8 text-lg">
+                Cook your first recipe to earn magnets!
+              </p>
             </div>
-          ))}
+          )}
+
+          {/* Magnets */}
+          {liveMagnets.map((m) => {
+            const pos = positions[m.id] ?? { x: m.x, y: m.y };
+            return (
+              <div
+                key={m.id}
+                onPointerDown={(e) => onPointerDown(e, m.id)}
+                className="absolute cursor-grab active:cursor-grabbing"
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  transform: `rotate(${m.rot}deg)`,
+                  filter: "drop-shadow(0 8px 10px rgba(0,0,0,0.28))",
+                  touchAction: "none",
+                }}
+              >
+                <MagnetVisual m={m} />
+              </div>
+            );
+          })}
         </section>
 
         <footer className="p-10 text-center border-t border-slate-200">
@@ -156,8 +174,35 @@ function MagnetsPage() {
   );
 }
 
+function StatCard({
+  emoji,
+  value,
+  label,
+  color,
+}: {
+  emoji: string;
+  value: string;
+  label: string;
+  color: "tomato" | "emerald" | "marigold" | "sky";
+}) {
+  const bg = {
+    tomato: "bg-tomato/10 text-tomato",
+    emerald: "bg-emerald/10 text-emerald",
+    marigold: "bg-marigold/10 text-amber-700",
+    sky: "bg-sky-100 text-sky-600",
+  }[color];
+
+  return (
+    <div className={`${bg} rounded-2xl p-3 text-center`}>
+      <div className="text-lg">{emoji}</div>
+      <div className="text-sm font-bold leading-tight">{value}</div>
+      <div className="text-[9px] uppercase tracking-wider opacity-70 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
 function MagnetVisual({ m }: { m: MagnetDef }) {
-  const base = `${colorClass[m.color]} ring-2 ring-white/40 flex flex-col items-center justify-center text-center px-3`;
+  const base = `${colorClass[m.color as MagnetStyle]} ring-2 ring-white/40 flex flex-col items-center justify-center text-center px-3`;
   const inner = (
     <>
       <span className="text-2xl leading-none mb-0.5">{m.emoji}</span>

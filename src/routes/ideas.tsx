@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowDown, Plus, Clock, Users, Flame } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { ArrowDown, Plus, Clock, Users, Flame, Loader2, Sparkles } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import {
   useItems,
@@ -8,9 +8,17 @@ import {
   sortByRescue,
   priorityLabel,
   freshnessText,
+  itemFreshness,
+  setItems,
   type Cuisine,
   type Diet,
+  type GeneratedRecipe,
 } from "@/lib/fridge";
+import { usePreferences, setPreferences } from "@/lib/preferences";
+import { getGeminiRecipes, type GeminiRecipeResponse } from "@/lib/gemini";
+import { storeRecipe, type FullRecipe } from "@/lib/recipeStore";
+import { recordCookedRecipe } from "@/lib/impact";
+import { getRecipeImage } from "@/lib/imageRegistry";
 
 export const Route = createFileRoute("/ideas")({
   head: () => ({
@@ -35,17 +43,94 @@ const toneClass = (p: "High" | "Medium" | "Low") =>
 
 function IdeasPage() {
   const items = useItems();
-  const [cuisine, setCuisine] = useState<Cuisine>("Indian");
-  const [diet, setDiet] = useState<Diet>("Veg");
+  const navigate = useNavigate();
+  const { cuisine, diet } = usePreferences();
 
-  const recipes = useMemo(
+  // Static fallback recipes (always available)
+  const staticRecipes = useMemo(
     () => generateRecipes(items, cuisine, diet),
     [items, cuisine, diet],
   );
+
   const prioritized = useMemo(() => sortByRescue(items), [items]);
-  const hero = recipes.find((r) => r.hero) ?? recipes[0];
-  const heroItem = hero ? items.find((i) => i.id === hero.fromItemId) : null;
-  const alternates = recipes.filter((r) => r.id !== hero?.id).slice(0, 4);
+  const heroItem = prioritized[0] ?? null;
+
+  // Gemini-enhanced hero recipe state
+  const [geminiData, setGeminiData] = useState<GeminiRecipeResponse | null>(null);
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [geminiError, setGeminiError] = useState(false);
+
+  // Call Gemini whenever hero item or preferences change
+  useEffect(() => {
+    if (!heroItem) return;
+
+    let cancelled = false;
+    setGeminiLoading(true);
+    setGeminiError(false);
+
+    getGeminiRecipes(
+      heroItem.name,
+      `${heroItem.count} katori`,
+      itemFreshness(heroItem),
+      cuisine,
+      diet,
+    )
+      .then((data) => {
+        if (!cancelled) {
+          setGeminiData(data);
+          setGeminiLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeminiError(true);
+          setGeminiLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [heroItem?.id, heroItem?.name, cuisine, diet]);
+
+  // Build the hero recipe — prefer Gemini, fall back to static
+  const heroStatic = staticRecipes.find((r) => r.hero) ?? staticRecipes[0];
+  const alternates = staticRecipes.filter((r) => r.id !== heroStatic?.id).slice(0, 4);
+
+  const heroTitle = geminiData?.heroRecipe ?? heroStatic?.title ?? "";
+  const heroSteps = geminiData?.steps ?? heroStatic?.steps ?? [];
+  const heroPrepTime = geminiData?.prepTime ?? heroStatic?.minutes ?? 20;
+  const heroServes = geminiData?.serves ?? heroStatic?.serves ?? 2;
+  const heroIngredients = geminiData?.ingredientsUsed ?? heroStatic?.uses.map((u) => u.label) ?? [];
+
+  // Build gemini alternative pills
+  const geminiAlts = geminiData?.alternativeRecipes ?? [];
+
+  const navigateToRecipe = useCallback(
+    (recipe: GeneratedRecipe, isHero: boolean) => {
+      const full: FullRecipe = {
+        ...recipe,
+        title: isHero ? heroTitle : recipe.title,
+        steps: isHero ? heroSteps : recipe.steps,
+        ingredientsUsed: isHero ? heroIngredients : recipe.uses.map((u) => u.label),
+        alternativeRecipes: geminiAlts,
+        katorisUsed: heroItem?.count ?? recipe.uses.length,
+      };
+      storeRecipe(full);
+      void navigate({ to: "/recipe/$recipeId", params: { recipeId: recipe.id } });
+    },
+    [heroTitle, heroSteps, heroIngredients, geminiAlts, heroItem, navigate],
+  );
+
+  const handleCookHero = () => {
+    if (!heroItem || !heroStatic) return;
+    recordCookedRecipe(heroItem.count);
+    // Remove or decrement item from fridge
+    setItems((prev) =>
+      prev
+        .map((i) => (i.id === heroItem.id ? { ...i, count: i.count - 1 } : i))
+        .filter((i) => i.count > 0),
+    );
+    navigateToRecipe(heroStatic, true);
+  };
 
   return (
     <div className="min-h-screen bg-fridge-base overflow-x-hidden">
@@ -66,14 +151,14 @@ function IdeasPage() {
             label="Cuisine"
             options={CUISINES}
             value={cuisine}
-            onChange={(v) => setCuisine(v as Cuisine)}
+            onChange={(v) => setPreferences({ cuisine: v as Cuisine })}
           />
           <div className="h-3" />
           <FilterGroup
             label="Diet"
             options={DIETS}
             value={diet}
-            onChange={(v) => setDiet(v as Diet)}
+            onChange={(v) => setPreferences({ diet: v as Diet })}
           />
         </section>
 
@@ -102,69 +187,101 @@ function IdeasPage() {
         )}
 
         {/* Hero Recommendation */}
-        {hero && heroItem && (
+        {heroStatic && heroItem && (
           <section className="px-8 pb-10">
             <div className="flex items-center gap-2 mb-3">
               <Flame className="size-3.5 text-tomato" />
               <span className="text-[10px] uppercase tracking-[0.25em] text-slate-600 font-semibold font-sans">
                 Hero — rescuing {heroItem.name}
               </span>
+              {geminiLoading && (
+                <span className="ml-auto flex items-center gap-1 text-[10px] text-slate-400">
+                  <Loader2 className="size-3 animate-spin" />
+                  AI thinking…
+                </span>
+              )}
+              {geminiData && !geminiLoading && (
+                <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
+                  <Sparkles className="size-3" />
+                  AI-powered
+                </span>
+              )}
+              {geminiError && !geminiLoading && (
+                <span className="ml-auto text-[10px] text-slate-400">Static recipe</span>
+              )}
             </div>
-            <article className="rounded-3xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-[0_24px_50px_-24px_rgba(30,70,120,0.35)]">
+
+            <article
+              className="rounded-3xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-[0_24px_50px_-24px_rgba(30,70,120,0.35)] cursor-pointer hover:ring-sky-300 transition-all"
+              onClick={() => navigateToRecipe(heroStatic, true)}
+            >
               <img
-                src={hero.image}
-                alt={hero.title}
+                src={heroStatic.image}
+                alt={heroTitle}
                 className="w-full aspect-[4/3] object-cover"
               />
               <div className="p-6">
                 <div
                   className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold ring-1 px-2.5 py-1 rounded-full mb-3 ${toneClass(priorityLabel(heroItem))}`}
                 >
-                  {priorityLabel(heroItem)} priority · {freshnessText(heroItem.freshness)}
+                  {priorityLabel(heroItem)} priority · {freshnessText(itemFreshness(heroItem))}
                 </div>
-                <h2 className="font-serif text-3xl text-slate-900 leading-tight">
-                  {hero.title}
-                </h2>
+
+                {geminiLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-8 bg-slate-100 rounded-xl animate-pulse w-3/4" />
+                    <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2" />
+                  </div>
+                ) : (
+                  <h2 className="font-serif text-3xl text-slate-900 leading-tight">
+                    {heroTitle}
+                  </h2>
+                )}
 
                 <div className="mt-4">
                   <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-2">
                     Ingredients used
                   </p>
-                  <ul className="flex flex-wrap gap-2">
-                    {hero.uses.map((u, i) => (
-                      <li
-                        key={i}
-                        className="inline-flex items-center gap-2 bg-sky-50 ring-1 ring-sky-100 rounded-full pl-1 pr-3 py-1"
-                      >
-                        {u.image ? (
-                          <img
-                            src={u.image}
-                            alt=""
-                            className="size-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="size-6 rounded-full bg-amber/20 grid place-items-center text-[10px]">
-                            🫓
-                          </span>
-                        )}
-                        <span className="text-sm text-slate-800">{u.label}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {geminiLoading ? (
+                    <div className="flex gap-2">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="h-8 w-28 bg-slate-100 rounded-full animate-pulse" />
+                      ))}
+                    </div>
+                  ) : (
+                    <ul className="flex flex-wrap gap-2">
+                      {heroIngredients.map((label, i) => (
+                        <li
+                          key={i}
+                          className="inline-flex items-center gap-2 bg-sky-50 ring-1 ring-sky-100 rounded-full pl-2 pr-3 py-1"
+                        >
+                          {i === 0 && heroItem.image ? (
+                            <img src={heroItem.image} alt="" className="size-6 rounded-full object-cover" />
+                          ) : (
+                            <span className="size-6 rounded-full bg-amber/20 grid place-items-center text-[10px]">🫓</span>
+                          )}
+                          <span className="text-sm text-slate-800">{label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div className="mt-5 flex items-center gap-5 text-sm text-slate-600">
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="size-4" />
-                    {hero.minutes} min
+                    {heroPrepTime} min
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Users className="size-4" />
-                    Serves {hero.serves}
+                    Serves {heroServes}
                   </span>
                 </div>
 
-                <button className="mt-6 w-full py-4 bg-slate-900 text-white font-semibold uppercase tracking-[0.2em] text-[11px] rounded-full hover:bg-slate-800 transition-colors">
+                <button
+                  className="mt-6 w-full py-4 bg-slate-900 text-white font-semibold uppercase tracking-[0.2em] text-[11px] rounded-full hover:bg-slate-800 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); handleCookHero(); }}
+                >
                   Cook This Tonight
                 </button>
               </div>
@@ -177,10 +294,10 @@ function IdeasPage() {
               </p>
               <div className="flex flex-col items-center gap-3">
                 <div className="flex items-center gap-3">
-                  {hero.uses.map((u, i) => (
+                  {heroStatic.uses.map((u, i) => (
                     <div key={i} className="flex items-center gap-3">
                       <IngredientTile label={u.label} image={u.image} />
-                      {i < hero.uses.length - 1 && (
+                      {i < heroStatic.uses.length - 1 && (
                         <Plus className="size-4 text-slate-400" />
                       )}
                     </div>
@@ -189,26 +306,74 @@ function IdeasPage() {
                 <ArrowDown className="size-5 text-slate-400" />
                 <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 w-32 h-32">
                   <img
-                    src={hero.image}
+                    src={heroStatic.image}
                     alt=""
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <p className="font-serif text-lg text-slate-900 italic">
-                  {hero.title}
+                  {heroTitle}
                 </p>
               </div>
             </div>
+
+            {/* Gemini alternative recipe pills */}
+            {geminiAlts.length > 0 && (
+              <div className="mt-8">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-semibold mb-3 flex items-center gap-1.5">
+                  <Sparkles className="size-3 text-emerald-500" />
+                  AI alternatives for {heroItem.name}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {geminiAlts.map((alt, i) => {
+                    const altRecipe: GeneratedRecipe = {
+                      id: `gemini-alt-${i}`,
+                      title: alt.title,
+                      image: getRecipeImage(alt.title),
+                      uses: [{ label: `${heroItem.count} Katori ${heroItem.name}`, image: heroItem.image }],
+                      minutes: alt.prepTime,
+                      serves: alt.serves,
+                      cuisine,
+                      fromItemId: heroItem.id,
+                      steps: [],
+                    };
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const full: FullRecipe = {
+                            ...altRecipe,
+                            ingredientsUsed: heroIngredients,
+                            alternativeRecipes: geminiAlts,
+                            katorisUsed: heroItem.count,
+                          };
+                          storeRecipe(full);
+                          void navigate({ to: "/recipe/$recipeId", params: { recipeId: altRecipe.id } });
+                        }}
+                        className="px-4 py-2 rounded-full bg-white ring-1 ring-slate-200 text-sm text-slate-700 font-medium hover:ring-sky-400 hover:bg-sky-50 transition-all"
+                      >
+                        {alt.title}
+                        <span className="text-[10px] text-slate-400 ml-2">{alt.prepTime}m</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {/* Alternatives */}
+        {/* Static Alternatives grid */}
         {alternates.length > 0 && (
           <section className="px-8 pb-16">
             <h3 className="font-serif text-2xl text-slate-900 mb-5">Or try…</h3>
             <div className="grid grid-cols-2 gap-5">
               {alternates.map((r) => (
-                <button key={r.id} className="text-left group">
+                <button
+                  key={r.id}
+                  className="text-left group"
+                  onClick={() => navigateToRecipe(r, false)}
+                >
                   <div className="rounded-2xl overflow-hidden ring-1 ring-slate-200 mb-3">
                     <img
                       src={r.image}
@@ -229,7 +394,7 @@ function IdeasPage() {
           </section>
         )}
 
-        {recipes.length === 0 && (
+        {staticRecipes.length === 0 && (
           <section className="px-8 pb-16 text-center">
             <p className="font-serif italic text-xl text-slate-600">
               Your fridge is empty — add a katori to get ideas.
